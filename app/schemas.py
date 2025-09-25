@@ -16,3 +16,15 @@ class Relation(BaseModel):
 
 class RelationsOutput(BaseModel):
     relations: List[Relation]
+
+
+class QueryRequest(BaseModel):
+    query: str
+    top_k: int = 3
+
+
+class QueryResponse(BaseModel):
+    answer: str
+    entities: List[str]
+    graph_relations: List[dict]
+    context: str
