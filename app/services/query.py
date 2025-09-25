@@ -1,12 +1,13 @@
-from typing import List, Dict
+from typing import List, Dict, Optional
 from openai import OpenAI
 from qdrant_client import QdrantClient
 from app.services.embeddings import embed_chunks
 from app.services.graph_store import fetch_relations_by_entities, get_all_entity_labels
-
+from qdrant_client.models import Filter, FieldCondition, MatchValue
 
 def graph_rag_query(
     question: str,
+    feature_id: Optional[str],
     top_k: int,
     openai_api_key: str,
     qdrant: QdrantClient,
@@ -16,8 +17,24 @@ def graph_rag_query(
 ) -> tuple[str, List[str], List[Dict[str, str]], str]:
     # 1) semantic retrieval from Qdrant
     emb = embed_chunks([question], model=embedding_model, api_key=openai_api_key)[0]
-    hits = qdrant.search(collection_name=collection, query_vector=emb, limit=top_k)
+
+    # query_filter = None
+    # if feature_id:
+    #     query_filter = {
+    #     "must": [
+    #         {"key": "feature_id", "match": {"value": feature_id}}
+    #     ]
+    # }
+
+    # hits = qdrant.search(collection_name=collection, query_vector=emb, limit=top_k ,query_filter=query_filter)
+    hits = qdrant.search(collection_name=collection, query_vector=emb, limit=top_k )
     text_context = "\n".join([h.payload.get("chunk", "") for h in hits])
+
+    chunk_doc_ids = list(
+        {h.payload.get("document_id") for h in hits if h.payload.get("document_id")}
+    )
+    print("chunk_doc_ids", chunk_doc_ids)
+
 
     # 2) extract entities using LLM
     client = OpenAI(api_key=openai_api_key)
@@ -45,17 +62,40 @@ def graph_rag_query(
     # 3) query Neo4j relations
     graph_relations = fetch_relations_by_entities(neo_driver, entities)
 
-    # 4) final answer
-    final_prompt = (
-        "Answer the question using the text context and knowledge graph.\n"
+     # 3b) filter relations using LLM
+    filter_prompt = (
+        "You are a knowledge graph assistant.\n"
+        "Given a user question and a list of relations (triplets: source - relation - target, "
+        "and their document ids) select only the relations that are directly relevant to answering the question.\n"
+        "Return them as a JSON array of objects with keys: source, source_doc_id, relation, target, target_doc_id.\n\n"
         f"Question: {question}\n\n"
-        f"Text context:\n{text_context}\n\n"
-        f"Graph relations:\n{graph_relations}\n"
+        f"Relations:\n{graph_relations}\n\n"
+        "Relevant relations:"
     )
-    ans = client.chat.completions.create(
-        model="gpt-4o-mini",
-        messages=[{"role": "user", "content": final_prompt}],
-    )
-    answer = ans.choices[0].message.content or ""
 
-    return answer, entities, graph_relations, text_context
+    filter_resp = client.chat.completions.create(
+        model="gpt-4o-mini",
+        messages=[{"role": "user", "content": filter_prompt}],
+        response_format={"type": "json_object"},  # ensures JSON parseable response
+    )
+
+    try:
+        final_graph_relations = filter_resp.choices[0].message.parsed["Relevant relations"]
+    except Exception:
+        # fallback: just keep raw relations if parsing fails
+        final_graph_relations = graph_relations
+
+    doc_ids = list(
+            set(
+                [rel["source_doc_id"] for rel in final_graph_relations if rel.get("source_doc_id")]
+                + [rel["target_doc_id"] for rel in final_graph_relations if rel.get("target_doc_id")]
+            )
+        )
+    print("doc_ids",doc_ids)
+
+    # all_doc_ids = list(set(doc_ids) | set(chunk_doc_ids))
+    all_doc_ids = list(set(doc_ids) - set(chunk_doc_ids))
+    print("All doc ids:", all_doc_ids)
+
+
+    return all_doc_ids, text_context

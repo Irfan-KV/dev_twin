@@ -76,8 +76,9 @@ def run_query(req: QueryRequest) -> QueryResponse:
     qdrant = QdrantClient(url=settings.qdrant_url, api_key=settings.qdrant_api_key)
     driver = create_driver(settings.neo4j_uri, settings.neo4j_user, settings.neo4j_pass)
 
-    answer, entities, graph_relations, context = graph_rag_query(
+    doc_ids, context = graph_rag_query(
         question=req.query,
+        feature_id=req.feature_id if req.feature_id else "",
         top_k=req.top_k,
         openai_api_key=settings.openai_api_key,
         qdrant=qdrant,
@@ -87,8 +88,6 @@ def run_query(req: QueryRequest) -> QueryResponse:
     )
 
     return QueryResponse(
-        answer=answer,
-        entities=entities,
-        graph_relations=graph_relations,
+        doc_ids=doc_ids,
         context=context,
     )

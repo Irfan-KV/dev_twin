@@ -34,16 +34,13 @@ def fetch_relations_by_entities(
             )
             for rec in session.run(query):
                 results.append(
-                    {
-                        "entity": rec.get("entity"),
-                        "entity_document_id": rec.get("entity_document_id"),
-                        "entity_feature_id": rec.get("entity_feature_id"),
-                        "related_entity": rec.get("related_entity"),
-                        "relation": rec.get("relation"),
-                        "reason": rec.get("reason"),
-                        "relation_document_id": rec.get("relation_document_id"),
-                        "relation_feature_id": rec.get("relation_feature_id"),
-                    }
+                {
+                    "source": rec["source"],
+                    "source_doc_id": rec["source_doc_id"],
+                    "relation": rec["relation"],
+                    "target": rec["target"],
+                    "target_doc_id": rec["target_doc_id"],
+                }
                 )
     return results
 
