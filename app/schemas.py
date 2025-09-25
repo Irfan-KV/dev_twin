@@ -1,5 +1,5 @@
 from pydantic import BaseModel
-from typing import List
+from typing import List, Optional
 
 
 class IngestRequest(BaseModel):
@@ -20,11 +20,10 @@ class RelationsOutput(BaseModel):
 
 class QueryRequest(BaseModel):
     query: str
+    feature_id: Optional[str] = None
     top_k: int = 3
 
 
 class QueryResponse(BaseModel):
-    answer: str
-    entities: List[str]
-    graph_relations: List[dict]
+    doc_ids: List[str]
     context: str

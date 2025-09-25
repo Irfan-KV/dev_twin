@@ -51,15 +51,17 @@ def fetch_relations_by_entities(
     query = (
         "MATCH (e:Entity)-[r]->(t:Entity) "
         "WHERE e.name IN $entities OR t.name IN $entities "
-        "RETURN e.name AS source, type(r) AS relation, t.name AS target"
+        "RETURN e.name AS source, e.document_id AS source_doc_id, type(r) AS relation, t.name AS target, t.document_id AS target_doc_id"
     )
     with driver.session() as session:
-        return session.read_transaction(
+        return session.execute_read(
             lambda tx: [
                 {
                     "source": rec["source"],
+                    "source_doc_id": rec["source_doc_id"],
                     "relation": rec["relation"],
                     "target": rec["target"],
+                    "target_doc_id": rec["target_doc_id"],
                 }
                 for rec in tx.run(query, entities=entities)
             ]
