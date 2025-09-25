@@ -4,7 +4,7 @@ from app.config import Settings
 from app.services.text import chunk_text
 from app.services.embeddings import embed_chunks
 from app.services.qdrant_store import ensure_collection, upsert_chunks
-from app.services.graph_store import create_driver, upsert_relations
+from app.services.graph_store import create_driver
 from qdrant_client import QdrantClient
 
 
@@ -45,13 +45,12 @@ def ingest_data(req: IngestRequest) -> dict:
     )
 
     driver = create_driver(settings.neo4j_uri, settings.neo4j_user, settings.neo4j_pass)
-    # upsert_document(driver, req.document_id, req.document_text, req.feature_id)
 
-    from app.services.relations import extract_relations
+    from app.services.relations import extract_kg
+    from app.services.graph_store import ingest_kg_to_neo4j_structured
 
-    relations_iter = extract_relations(req.document_text, settings.openai_api_key)
-    # upsert_relations(driver, relations_iter, req.document_id, req.feature_id)
-    upsert_relations(driver, relations_iter)
+    kg = extract_kg(req.document_text, settings.openai_api_key)
+    ingest_kg_to_neo4j_structured(driver, kg)
 
     return {
         "status": "ingested",

@@ -1,23 +1,10 @@
 from typing import Iterable, List, Dict
 from neo4j import GraphDatabase, Driver
+from app.schemas import KnowledgeGraphOutput
 
 
 def create_driver(uri: str, user: str, password: str) -> Driver:
     return GraphDatabase.driver(uri, auth=(user, password))
-
-
-# def upsert_document(
-#     driver: Driver, document_id: str, text: str, feature_id: str
-# ) -> None:
-#     with driver.session() as s:
-#         s.execute_write(
-#             lambda tx: tx.run(
-#                 "MERGE (d:Document {id:$id}) SET d.text=$text, d.feature_id=$fid",
-#                 id=document_id,
-#                 text=text,
-#                 fid=feature_id,
-#             )
-#         )
 
 
 def upsert_relations(
@@ -45,6 +32,12 @@ def upsert_relations(
             )
 
 
+def get_all_entity_labels(driver: Driver) -> List[str]:
+    with driver.session() as session:
+        labels = [record["label"] for record in session.run("CALL db.labels()")]
+    return labels
+
+
 def fetch_relations_by_entities(
     driver: Driver, entities: List[str]
 ) -> List[Dict[str, str]]:
@@ -64,3 +57,34 @@ def fetch_relations_by_entities(
                 for rec in tx.run(query, entities=entities)
             ]
         )
+
+
+def safe_label(name: str) -> str:
+    return name.replace("`", "").replace(" ", "_").replace("-", "_").replace("/", "_")
+
+
+def ingest_kg_to_neo4j_structured(
+    driver: Driver, kg_output: KnowledgeGraphOutput
+) -> None:
+    with driver.session() as session:
+        for entity in kg_output.entities:
+            label_safe = safe_label(entity.name)
+            session.run(
+                f"MERGE (n:`{label_safe}` {{name: $name}})",
+                name=entity.name,
+            )
+        for rel in kg_output.relationships:
+            from_label = safe_label(rel.from_entity)
+            to_label = safe_label(rel.to_entity)
+            rel_type = safe_label(rel.type)
+            session.run(
+                f"""
+                MATCH (a:`{from_label}` {{name: $from_name}})
+                MATCH (b:`{to_label}` {{name: $to_name}})
+                MERGE (a)-[r:`{rel_type}`]->(b)
+                SET r.explanation = $explanation
+                """,
+                from_name=rel.from_entity,
+                to_name=rel.to_entity,
+                explanation=rel.explanation,
+            )
