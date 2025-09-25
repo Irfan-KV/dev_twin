@@ -1,35 +1,10 @@
-from typing import Iterable, List, Dict
+from typing import List, Dict
 from neo4j import GraphDatabase, Driver
 from app.schemas import KnowledgeGraphOutput
 
 
 def create_driver(uri: str, user: str, password: str) -> Driver:
     return GraphDatabase.driver(uri, auth=(user, password))
-
-
-def upsert_relations(
-    driver: Driver,
-    relations: Iterable[tuple[str, str, str]],
-    document_id: str,
-    feature_id: str,
-) -> None:
-    with driver.session() as s:
-        for head, relation, tail in relations:
-            rel_clean = relation.replace(" ", "_")
-            s.execute_write(
-                lambda tx, a=head, r=rel_clean, b=tail, d=document_id, f=feature_id: tx.run(
-                    "MERGE (x:Entity {name:$a}) "
-                    "SET x.document_id=$d, x.feature_id=$f "
-                    "MERGE (y:Entity {name:$b}) "
-                    "SET y.document_id=$d, y.feature_id=$f "
-                    f"MERGE (x)-[rel:{r}]->(y) "
-                    "SET rel.document_id=$d, rel.feature_id=$f",
-                    a=a,
-                    b=b,
-                    d=d,
-                    f=f,
-                )
-            )
 
 
 def get_all_entity_labels(driver: Driver) -> List[str]:
@@ -41,22 +16,25 @@ def get_all_entity_labels(driver: Driver) -> List[str]:
 def fetch_relations_by_entities(
     driver: Driver, entities: List[str]
 ) -> List[Dict[str, str]]:
-    query = (
-        "MATCH (e:Entity)-[r]->(t:Entity) "
-        "WHERE e.name IN $entities OR t.name IN $entities "
-        "RETURN e.name AS source, type(r) AS relation, t.name AS target"
-    )
+    results: List[Dict[str, str]] = []
     with driver.session() as session:
-        return session.read_transaction(
-            lambda tx: [
-                {
-                    "source": rec["source"],
-                    "relation": rec["relation"],
-                    "target": rec["target"],
-                }
-                for rec in tx.run(query, entities=entities)
-            ]
-        )
+        for ent in entities:
+            label_safe = safe_label(ent)
+            query = (
+                f"MATCH (n:`{label_safe}`) "
+                "OPTIONAL MATCH (m)-[r]->(n) "
+                "RETURN n.name AS entity, m.name AS related_entity, type(r) AS relation, r.explanation AS reason"
+            )
+            for rec in session.run(query):
+                results.append(
+                    {
+                        "entity": rec.get("entity"),
+                        "related_entity": rec.get("related_entity"),
+                        "relation": rec.get("relation"),
+                        "reason": rec.get("reason"),
+                    }
+                )
+    return results
 
 
 def safe_label(name: str) -> str:
