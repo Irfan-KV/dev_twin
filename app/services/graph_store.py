@@ -36,10 +36,10 @@ def fetch_relations_by_entities(
                 results.append(
                 {
                     "source": rec["source"],
-                    "source_doc_id": rec["source_doc_id"],
+                    "source_doc_id": rec["source_document_id"],
                     "relation": rec["relation"],
                     "target": rec["target"],
-                    "target_doc_id": rec["target_doc_id"],
+                    "target_doc_id": rec["target_document_id"],
                 }
                 )
     return results

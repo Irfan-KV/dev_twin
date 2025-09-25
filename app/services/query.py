@@ -30,6 +30,8 @@ def graph_rag_query(
     hits = qdrant.search(collection_name=collection, query_vector=emb, limit=top_k )
     text_context = "\n".join([h.payload.get("chunk", "") for h in hits])
 
+    print("Payloads:", [h.payload.keys() for h in hits])
+
     chunk_doc_ids = list(
         {h.payload.get("document_id") for h in hits if h.payload.get("document_id")}
     )
@@ -93,8 +95,8 @@ def graph_rag_query(
         )
     print("doc_ids",doc_ids)
 
-    # all_doc_ids = list(set(doc_ids) | set(chunk_doc_ids))
-    all_doc_ids = list(set(doc_ids) - set(chunk_doc_ids))
+    all_doc_ids = list(set(doc_ids) | set(chunk_doc_ids))
+    # all_doc_ids = list(set(doc_ids) - set(chunk_doc_ids))
     print("All doc ids:", all_doc_ids)
 
 
