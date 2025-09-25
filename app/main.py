@@ -4,7 +4,7 @@ from app.config import Settings
 from app.services.text import chunk_text
 from app.services.embeddings import embed_chunks
 from app.services.qdrant_store import ensure_collection, upsert_chunks
-from app.services.graph_store import create_driver, upsert_document, upsert_relations
+from app.services.graph_store import create_driver, upsert_relations
 from qdrant_client import QdrantClient
 
 
