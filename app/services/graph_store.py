@@ -23,15 +23,26 @@ def fetch_relations_by_entities(
             query = (
                 f"MATCH (n:`{label_safe}`) "
                 "OPTIONAL MATCH (m)-[r]->(n) "
-                "RETURN n.name AS entity, m.name AS related_entity, type(r) AS relation, r.explanation AS reason"
+                "RETURN n.name AS source, "
+                "n.document_id AS source_document_id, "
+                "n.feature_id AS source_feature_id, "
+                "m.name AS target, "
+                "type(r) AS relation, "
+                "r.explanation AS reason, "
+                "r.document_id AS target_document_id, "
+                "r.feature_id AS target_feature_id"
             )
             for rec in session.run(query):
                 results.append(
                     {
                         "entity": rec.get("entity"),
+                        "entity_document_id": rec.get("entity_document_id"),
+                        "entity_feature_id": rec.get("entity_feature_id"),
                         "related_entity": rec.get("related_entity"),
                         "relation": rec.get("relation"),
                         "reason": rec.get("reason"),
+                        "relation_document_id": rec.get("relation_document_id"),
+                        "relation_feature_id": rec.get("relation_feature_id"),
                     }
                 )
     return results
@@ -42,14 +53,20 @@ def safe_label(name: str) -> str:
 
 
 def ingest_kg_to_neo4j_structured(
-    driver: Driver, kg_output: KnowledgeGraphOutput
+    driver: Driver,
+    kg_output: KnowledgeGraphOutput,
+    document_id: str,
+    feature_id: str,
 ) -> None:
     with driver.session() as session:
         for entity in kg_output.entities:
             label_safe = safe_label(entity.name)
             session.run(
-                f"MERGE (n:`{label_safe}` {{name: $name}})",
+                f"MERGE (n:`{label_safe}` {{name: $name}}) "
+                "SET n.document_id=$document_id, n.feature_id=$feature_id",
                 name=entity.name,
+                document_id=document_id,
+                feature_id=feature_id,
             )
         for rel in kg_output.relationships:
             from_label = safe_label(rel.from_entity)
@@ -60,9 +77,13 @@ def ingest_kg_to_neo4j_structured(
                 MATCH (a:`{from_label}` {{name: $from_name}})
                 MATCH (b:`{to_label}` {{name: $to_name}})
                 MERGE (a)-[r:`{rel_type}`]->(b)
-                SET r.explanation = $explanation
+                SET r.explanation = $explanation,
+                    r.document_id = $document_id,
+                    r.feature_id = $feature_id
                 """,
                 from_name=rel.from_entity,
                 to_name=rel.to_entity,
                 explanation=rel.explanation,
+                document_id=document_id,
+                feature_id=feature_id,
             )

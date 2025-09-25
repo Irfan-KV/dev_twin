@@ -50,7 +50,7 @@ def ingest_data(req: IngestRequest) -> dict:
     from app.services.graph_store import ingest_kg_to_neo4j_structured
 
     kg = extract_kg(req.document_text, settings.openai_api_key)
-    ingest_kg_to_neo4j_structured(driver, kg)
+    ingest_kg_to_neo4j_structured(driver, kg, req.document_id, req.feature_id)
 
     return {
         "status": "ingested",
