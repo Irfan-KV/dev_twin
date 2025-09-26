@@ -19,7 +19,7 @@ class Settings:
         self.neo4j_uri = os.getenv("NEO4J_URI", "")
         self.neo4j_user = os.getenv("NEO4J_USER", "")
         self.neo4j_pass = os.getenv("NEO4J_PASS", "")
-        self.qdrant_collection = os.getenv("QDRANT_COLLECTION", "graph_rag_demo")
+        self.qdrant_collection = os.getenv("QDRANT_COLLECTION", "dev_twin")
         self.embedding_model = os.getenv("EMBEDDING_MODEL", "text-embedding-3-small")
 
     def validate(self) -> List[str]:

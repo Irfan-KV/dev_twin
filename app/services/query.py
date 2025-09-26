@@ -18,16 +18,19 @@ def graph_rag_query(
     # 1) semantic retrieval from Qdrant
     emb = embed_chunks([question], model=embedding_model, api_key=openai_api_key)[0]
 
-    # query_filter = None
-    # if feature_id:
-    #     query_filter = {
-    #     "must": [
-    #         {"key": "feature_id", "match": {"value": feature_id}}
-    #     ]
-    # }
+    query_filter = None
+    if feature_id:
+        query_filter = Filter(
+        must=[FieldCondition(
+            key="feature_id",
+            match=MatchValue(value=feature_id)
+        )]
+    )
 
-    # hits = qdrant.search(collection_name=collection, query_vector=emb, limit=top_k ,query_filter=query_filter)
-    hits = qdrant.search(collection_name=collection, query_vector=emb, limit=top_k )
+    print("COLLECTION",qdrant.get_collection("dev_twin"))
+
+    hits = qdrant.search(collection_name=collection, query_vector=emb, limit=top_k ,query_filter=query_filter)
+    # hits = qdrant.search(collection_name=collection, query_vector=emb, limit=top_k ,)
     text_context = "\n".join([h.payload.get("chunk", "") for h in hits])
 
     print("Payloads:", [h.payload.keys() for h in hits])
@@ -95,8 +98,8 @@ def graph_rag_query(
         )
     print("doc_ids",doc_ids)
 
-    all_doc_ids = list(set(doc_ids) | set(chunk_doc_ids))
-    # all_doc_ids = list(set(doc_ids) - set(chunk_doc_ids))
+    # all_doc_ids = list(set(doc_ids) | set(chunk_doc_ids))
+    all_doc_ids = list(set(doc_ids) - set(chunk_doc_ids))
     print("All doc ids:", all_doc_ids)
 
 

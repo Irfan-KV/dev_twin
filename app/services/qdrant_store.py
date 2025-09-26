@@ -13,10 +13,19 @@ def ensure_collection(client: QdrantClient, collection: str) -> None:
             vectors_config=qmodels.VectorParams(
                 size=1536, distance=qmodels.Distance.COSINE
             ),
-             payload_schema={
-        "feature_id": qmodels.PayloadSchemaType.KEYWORD}
         )
 
+    # ✅ Ensure payload indexes exist (idempotent)
+    for field in ["feature_id", "document_id"]:
+        try:
+            client.create_payload_index(
+                collection_name=collection,
+                field_name=field,
+                field_schema=qmodels.PayloadSchemaType.KEYWORD
+            )
+        except Exception as e:
+            if "already exists" not in str(e):
+                raise
 
 def upsert_chunks(
     client: QdrantClient,
